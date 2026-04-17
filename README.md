@@ -39,29 +39,27 @@ See [`skills/stock-pitch/references/sector-patterns.md`](skills/stock-pitch/refe
 
 ## Installation
 
-### Option A: Install as a Claude Code plugin
+**For LCS colleagues running on their own compute**, the end-to-end guide lives in **[`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md)** — zero to first deployed portal in ~15 minutes.
+
+TL;DR:
 
 ```bash
-# Clone into your Claude Code plugins directory
-cd ~/.claude/plugins/marketplaces
-git clone https://github.com/eratner15/stock-pitch.git
+git clone git@github.com:eratner15/stock-pitch.git
+cd stock-pitch
+npm install --prefix boilerplate
+./scripts/init.sh          # prompts for worker name, deploys stub
 ```
 
-Then restart Claude Code. The skill becomes available as:
+Then in a Claude Code session:
 
 ```
-/stock-pitch:stock-pitch TICKER
+/plugin install /absolute/path/to/stock-pitch
+/stock-pitch:stock-pitch META
 ```
 
-### Option B: Install the skill only
+The skill fetches data, builds 6 pages, runs the Phase 3.7 Quality Gate, and deploys — all autonomously. Cost: ~$1.50 of Opus compute per ticker.
 
-```bash
-# Clone into your skills directory
-cd ~/.claude/skills
-git clone https://github.com/eratner15/stock-pitch.git
-```
-
-Then invoke via natural language: *"Build a stock-pitch for BX"* — Claude will pick up the skill automatically.
+See `examples/meta/` for a complete reference build that demonstrates every v1.2 feature.
 
 ---
 

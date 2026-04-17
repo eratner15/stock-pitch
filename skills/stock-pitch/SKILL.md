@@ -218,6 +218,31 @@ Using ALL collected data, form a proprietary thesis:
 3. What is the biggest risk the market is correctly pricing?
 4. What is the 12-month risk/reward setup?
 
+**Variant Perception — Counter-Consensus Requirement (added April 2026):**
+
+Each "variant" pillar MUST satisfy all three of the following tests, or it is
+not variant — it is consensus rewritten, and should be struck or reworded:
+
+1. **Name the specific sell-side view being contradicted.** Not "the Street
+   thinks capex is bad" — instead "Morgan Stanley's Dec-2025 note models FoA
+   op margin compressing 300bps by FY27." Include firm + date.
+2. **State the magnitude delta in dollars per share or in absolute $B.** Not
+   "we think they're too pessimistic" — instead "LCS models FoA margin +200bps
+   by FY27, a 500bps delta worth $40-55/share."
+3. **State the resolution date — a specific earnings print or event window.**
+   Not "plays out over the next few years" — instead "test: FY26 Q4 FoA margin
+   prints >55.5% (late Jan 2027)."
+
+If all three pillars restate views held by 3+ sell-side firms under active
+coverage, the "variant" perception is not variant. Rewrite.
+
+**Anti-fabrication on analyst names:** When citing specific analysts and price
+targets (e.g., in the consensus page), mark individual analyst PTs as
+`~approximate latest published` unless a WebSearch-in-session has surfaced a
+dated PT within the last 90 days. Aggregates (mean PT, ratings distribution)
+can be sourced from StockAnalysis / MarketBeat / Public.com directly; individual
+analyst rows are high-hallucination-risk and must be either verified or softened.
+
 **Rating framework:**
 - BUY: >20% upside with identifiable catalysts
 - HOLD: Fair value within 10%, no clear catalyst
@@ -351,6 +376,36 @@ The interactive model page should include these features beyond the core slider 
 - "Export PDF" button triggers `window.print()`
 - Print CSS hides nav, sidebar controls, and interactive elements
 - Memo, questions, and model pages all support this
+
+### Phase 3.7: Quality Gate (Pre-Deploy)
+
+**Added April 2026 after the META v1.1 build shipped with three classes of
+latent failure (units bugs, orphan sliders, soft-consensus pillars). Running
+all five gates takes under 10 minutes and would have caught every failure
+before deploy.**
+
+Before Phase 4, run the checklist in `references/quality-gate.md`:
+
+1. **Dimensional Analysis** — DCF/EV PTs in $50-$5000 range, FY last-actual
+   spot-checks within 5% of reported (FCF, EPS, op margin).
+2. **Slider-Wiring Audit** — every slider ID in the HTML must be referenced
+   by `computeScenario()`, and perturbing each preset by ±20% must produce a
+   downstream change.
+3. **Preset Monotonicity** — Bull > Base > Street > Bear on DCF PT, EV/EBITDA
+   PT, blended PT, and FY27/28 EPS.
+4. **Counter-Consensus Requirement** — each variant-perception pillar must
+   name the specific sell-side view contradicted, state the $ magnitude delta,
+   and state the resolution date (specific earnings print or event window).
+5. **Memo ⇌ Model Reconciliation** — the memo's Financial Trajectory table
+   cells must match the model's base-case `computeScenario(PRESETS.base)`
+   outputs within 2%. Prefer generating the memo table from the model.
+
+**Bonus (high-yield):** run `/codex:rescue` on the generated model file with
+a short prompt asking for math-bug and narrative-drift review. Time cost: ~5
+minutes. Block the Phase 4 deploy on any critical-severity finding.
+
+Do not proceed to Phase 4 until all five gates pass. If any gate fails, fix
+and re-run the full gate set.
 
 ### Phase 4: Wire Routing & Deploy
 

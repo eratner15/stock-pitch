@@ -9,3 +9,4 @@ wrangler.toml
 !wrangler.toml.example
 .vscode/
 .idea/
+*:Zone.Identifier

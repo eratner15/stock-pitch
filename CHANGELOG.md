@@ -2,6 +2,36 @@
 
 All notable changes to the `stock-pitch` plugin will be documented in this file.
 
+## [1.2.0] — 2026-04-17
+
+### Added
+
+- **Phase 3.7 Quality Gate** (`references/quality-gate.md`) — five mechanical
+  pre-deploy checks that catch dimensional bugs, orphan sliders, preset
+  ordering violations, soft-consensus pillars, and memo-model drift. All five
+  gates under 10 minutes total. Bonus sixth gate delegates to `/codex:rescue`
+  for independent math review.
+- **Counter-consensus requirement** in Phase 2F — each variant-perception
+  pillar must name the specific sell-side view contradicted, the $ magnitude
+  delta, and the resolution date. Falsifiable-in-a-known-window test.
+- **Anti-fabrication on analyst names** — individual analyst PTs must be
+  WebSearch-verified within 90 days or marked `~approximate latest published`.
+  Aggregates can be sourced from StockAnalysis/MarketBeat/Public.com.
+
+### Retrospective — META v1.1 Build
+
+Built Meta Platforms portal April 16, 2026. Shipped with three classes of
+latent failure that drove the v1.2 gate additions:
+
+- Dimensional bug (`PT * 1000`) produced six-figure PTs. Gate 1 now catches.
+- Orphan slider (Reality Labs Op Loss wired in UI, not in `computeScenario`).
+  Gate 2 now catches.
+- Three "variant" pillars were paraphrases of published JPM/MS/Jefferies
+  notes. Gate 4 now enforces counter-consensus.
+
+All caught by `/codex:rescue` post-deploy (3-min review). Bonus gate makes
+this a standard part of the workflow.
+
 ## [1.1.0] — 2026-04-14
 
 ### Added
