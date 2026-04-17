@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.1.0] — 2026-04-17
+
+### Changed (auto-merged)
+
+Add marketplace.json for team distribution
+
+Lets colleagues install via:
+  extraKnownMarketplaces."stock-pitch" → github source eratner15/stock-pitch
+  enabledPlugins."stock-pitch@stock-pitch": true
+
+Or via CLI:
+  /plugin marketplace add eratner15/stock-pitch
+  /plugin install stock-pitch@stock-pitch
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+
 All notable changes to the `stock-pitch` plugin will be documented in this file.
 
 ## [1.2.0] — 2026-04-17
