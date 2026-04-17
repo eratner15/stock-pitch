@@ -1,0 +1,15 @@
+{
+  "name": "stock-pitch",
+  "owner": {
+    "name": "Levin Capital Strategies",
+    "url": "https://github.com/eratner15"
+  },
+  "plugins": [
+    {
+      "name": "stock-pitch",
+      "source": "./",
+      "description": "Build institutional equity research portals from a ticker. Sector-aware, source-tagged, deployable to Cloudflare Workers. Includes Phase 3.7 Quality Gate and trust-by-default contribution pipeline.",
+      "version": "1.2.0"
+    }
+  ]
+}
