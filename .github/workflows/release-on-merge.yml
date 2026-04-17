@@ -1,0 +1,96 @@
+name: Release on Merge
+
+# When a PR merges to main, bump skill version, tag, generate changelog entry,
+# and publish a release. Additive changes → minor bump. Refactor-only → patch.
+# Anything labeled 'breaking' is blocked from auto-merge upstream.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'skills/**'
+      - 'examples/**'
+      - 'scripts/**'
+      - '.github/workflows/**'
+
+jobs:
+  release:
+    name: Version bump + changelog + tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine bump type
+        id: bump
+        run: |
+          set -euo pipefail
+          # Read last merge commit message for the merged PR
+          MSG=$(git log -1 --pretty=%B)
+          # Default to patch; additive keywords → minor
+          BUMP="patch"
+          if echo "$MSG" | grep -iqE 'add|new|feature|enhance'; then
+            BUMP="minor"
+          fi
+          echo "type=$BUMP" >> "$GITHUB_OUTPUT"
+
+      - name: Read current version
+        id: current
+        run: |
+          V=$(jq -r '.version' .claude-plugin/plugin.json)
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Compute new version
+        id: next
+        run: |
+          set -euo pipefail
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${{ steps.current.outputs.version }}"
+          case "${{ steps.bump.outputs.type }}" in
+            minor) MINOR=$((MINOR+1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH+1)) ;;
+          esac
+          echo "version=${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
+
+      - name: Update plugin.json
+        run: |
+          jq '.version = "${{ steps.next.outputs.version }}"' .claude-plugin/plugin.json > .tmp.json
+          mv .tmp.json .claude-plugin/plugin.json
+
+      - name: Prepend CHANGELOG entry
+        run: |
+          set -euo pipefail
+          DATE=$(date +%Y-%m-%d)
+          V="${{ steps.next.outputs.version }}"
+          MSG=$(git log -1 --pretty=%B | head -20)
+          ENTRY="## [${V}] — ${DATE}\n\n### Changed (auto-merged)\n\n${MSG}\n"
+          # Insert after the top "# Changelog" header
+          awk -v entry="$ENTRY" '
+            /^# Changelog/ { print; print ""; print entry; next }
+            { print }
+          ' CHANGELOG.md > CHANGELOG.tmp.md
+          mv CHANGELOG.tmp.md CHANGELOG.md
+
+      - name: Commit version bump
+        run: |
+          git config user.name "stock-pitch-bot"
+          git config user.email "bot@stock-pitch.local"
+          git add .claude-plugin/plugin.json CHANGELOG.md
+          git commit -m "release: v${{ steps.next.outputs.version }} [skip ci]" || echo "No changes to commit"
+          git push origin main
+
+      - name: Create git tag + release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V="${{ steps.next.outputs.version }}"
+          git tag -a "v${V}" -m "Release v${V}"
+          git push origin "v${V}"
+          gh release create "v${V}" \
+            --title "v${V}" \
+            --notes "Auto-generated release. See CHANGELOG.md for details." \
+            --latest

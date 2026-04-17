@@ -1,0 +1,46 @@
+name: Auto-Merge on Green
+
+# Trust-by-default: when all required checks pass on a PR labeled
+# 'auto-review', squash-merge automatically and let the release workflow
+# handle versioning + distribution.
+#
+# Escalates (does not merge) if any check failed or PR is labeled
+# 'needs-review' manually by a human.
+
+on:
+  pull_request:
+    types: [labeled, unlabeled, synchronize, opened, reopened]
+  check_suite:
+    types: [completed]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  merge:
+    name: Auto-merge if all green
+    runs-on: ubuntu-latest
+    # Only run on PRs labeled auto-review (opted in by /skill:contribute)
+    if: contains(github.event.pull_request.labels.*.name, 'auto-review')
+    steps:
+      - name: Check for needs-review block label
+        id: block
+        run: |
+          # If a human has labeled 'needs-review', skip auto-merge entirely
+          LABELS='${{ toJson(github.event.pull_request.labels.*.name) }}'
+          if echo "$LABELS" | grep -q "needs-review"; then
+            echo "blocked=true" >> "$GITHUB_OUTPUT"
+            echo "⚠ PR labeled 'needs-review' — human review required, no auto-merge"
+          else
+            echo "blocked=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Enable auto-merge
+        if: steps.block.outputs.blocked == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr merge "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --squash \
+            --auto \
+            --delete-branch

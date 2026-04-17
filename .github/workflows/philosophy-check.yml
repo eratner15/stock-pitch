@@ -1,0 +1,126 @@
+name: Philosophy Check
+
+# Uses Claude API to verify contribution aligns with skill philosophy
+# (zero hallucination tolerance, sector-aware architecture, institutional
+# presentation, falsifiable variant perception). Posts a review comment.
+#
+# Green = aligned. Red = philosophy gate failed → blocks auto-merge.
+
+on:
+  pull_request:
+    paths:
+      - 'skills/stock-pitch/**'
+      - 'examples/**'
+      - 'boilerplate/src/pages/**'
+
+jobs:
+  check:
+    name: Philosophy alignment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate diff context
+        id: diff
+        run: |
+          set -euo pipefail
+          git fetch origin "${{ github.base_ref }}" --depth=50
+          # Capture full diff and PR body; limit size for Claude context budget
+          {
+            echo "=== PR Title ==="
+            echo "${{ github.event.pull_request.title }}"
+            echo ""
+            echo "=== PR Body ==="
+            echo '${{ github.event.pull_request.body }}' | head -c 5000
+            echo ""
+            echo "=== Diff ==="
+            git diff "origin/${{ github.base_ref }}"...HEAD -- skills/ examples/ boilerplate/src/pages/ | head -c 50000
+          } > /tmp/context.txt
+          echo "size=$(wc -c < /tmp/context.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Call Claude for philosophy check
+        id: claude
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+            echo "⚠ ANTHROPIC_API_KEY not set — skipping philosophy check (non-blocking in this mode)"
+            echo "result=skipped" >> "$GITHUB_OUTPUT"
+            echo "memo=ANTHROPIC_API_KEY not configured in repo secrets; add to enable automated philosophy review." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CONTEXT=$(cat /tmp/context.txt | jq -Rs .)
+
+          PROMPT=$(cat <<'EOF'
+          You are reviewing a proposed contribution to the stock-pitch Claude Code skill. The skill builds institutional equity research portals. Its core principles are:
+
+          1. **AI-first, not sell-side-first** — autonomous primary-source research
+          2. **Zero hallucination tolerance** — every financial figure traces to a verifiable source tag
+          3. **Sector-aware architecture** — different business models get different analytical frameworks
+          4. **Institutional presentation** — 6 interconnected pages with shared design language
+          5. **Falsifiable variant perception** — every thesis pillar names a sell-side view contradicted, $ magnitude, resolution date
+          6. **Mechanical quality gates** — dimensional analysis, slider-wiring, preset monotonicity
+
+          Review the contribution below. Output JSON with:
+          {
+            "verdict": "align" | "concern" | "block",
+            "rationale": "one paragraph",
+            "risks": ["specific risk", ...],
+            "suggestions": ["specific improvement", ...]
+          }
+
+          "align" = ships the principles forward; auto-merge eligible
+          "concern" = directionally fine but has specific issues; human review before merge
+          "block" = violates a principle; do not merge
+
+          Contribution context follows:
+          ----
+          EOF
+          )
+
+          FULL_PROMPT="${PROMPT}$(cat /tmp/context.txt)"
+
+          RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d "$(jq -n --arg p "$FULL_PROMPT" '{
+              model: "claude-opus-4-7",
+              max_tokens: 1500,
+              messages: [{role:"user", content:$p}]
+            }')")
+
+          MEMO=$(echo "$RESPONSE" | jq -r '.content[0].text // "Philosophy check failed — no response"')
+          VERDICT=$(echo "$MEMO" | grep -oE '"verdict"\s*:\s*"[a-z]+"' | head -1 | grep -oE '"[a-z]+"$' | tr -d '"' || echo "unknown")
+
+          echo "memo<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$MEMO" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "result=$VERDICT" >> "$GITHUB_OUTPUT"
+
+      - name: Post review comment
+        if: steps.claude.outputs.result != 'skipped'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const memo = `${{ steps.claude.outputs.memo }}`;
+            const verdict = `${{ steps.claude.outputs.result }}`;
+            const icon = verdict === 'align' ? '✅' : verdict === 'concern' ? '⚠️' : '🛑';
+            const body = `## ${icon} Philosophy Check — ${verdict}\n\n\`\`\`json\n${memo}\n\`\`\``;
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
+
+      - name: Fail on block verdict
+        if: steps.claude.outputs.result == 'block'
+        run: |
+          echo "✗ Philosophy check returned 'block' — contribution violates a skill principle"
+          exit 1

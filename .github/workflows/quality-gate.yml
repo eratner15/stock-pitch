@@ -1,0 +1,70 @@
+name: Quality Gate
+
+# Runs on every PR and push to main. Enforces Phase 3.7 Gates 1-3
+# (dimensional analysis, slider-wiring audit, preset monotonicity)
+# against any TICKER-model.ts file in the diff.
+#
+# A green run here is a precondition for auto-merge.
+
+on:
+  pull_request:
+    paths:
+      - 'skills/stock-pitch/**'
+      - 'examples/**/*-model.ts'
+      - 'boilerplate/src/pages/*-model.ts'
+      - 'scripts/quality-gate.sh'
+  push:
+    branches: [main]
+
+jobs:
+  gate:
+    name: Gates 1-3 (mechanical)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Find model files changed in this PR
+        id: models
+        run: |
+          set -euo pipefail
+          # On PR: diff against base. On push to main: check all example model files.
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            BASE="${{ github.base_ref }}"
+            git fetch origin "$BASE" --depth=1
+            CHANGED=$(git diff --name-only "origin/$BASE"...HEAD | grep -E '\-model\.ts$' || true)
+          else
+            CHANGED=$(find examples boilerplate/src/pages -name '*-model.ts' 2>/dev/null || true)
+          fi
+          echo "Files to check:"
+          echo "$CHANGED"
+          echo "files<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CHANGED" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Run quality-gate.sh on each model file
+        if: steps.models.outputs.files != ''
+        run: |
+          set -euo pipefail
+          chmod +x scripts/quality-gate.sh
+          FAIL=0
+          while IFS= read -r f; do
+            [[ -z "$f" ]] && continue
+            [[ -f "$f" ]] || continue
+            echo ""
+            echo "══════════════════════════════════════════════════════════"
+            echo "  $f"
+            echo "══════════════════════════════════════════════════════════"
+            if ! ./scripts/quality-gate.sh "$f"; then
+              FAIL=$((FAIL+1))
+            fi
+          done <<< "${{ steps.models.outputs.files }}"
+          if [[ "$FAIL" -gt 0 ]]; then
+            echo ""
+            echo "✗ Quality gate failed on $FAIL file(s). Block merge."
+            exit 1
+          fi
+
+      - name: No model files changed — skip
+        if: steps.models.outputs.files == ''
+        run: echo "No -model.ts files in this PR. Quality gate not applicable."
